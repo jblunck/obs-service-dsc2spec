@@ -1,0 +1,8 @@
+<service name="dsc2spec">
+    <summary>Create a RPM specfile based on Debian *.dsc</summary>
+    <description>This service takes a Debian source package and converts it to a RPM spec file.</description>
+    <parameter name="filename">
+        <description>The name of the output RPM specfile</description>
+        <required/>
+    </parameter>
+</service>

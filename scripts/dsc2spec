@@ -1,0 +1,218 @@
+#!/usr/bin/perl
+#
+# Script to create an RPM specfile based on a Debian source package
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
+
+
+use strict;
+use warnings;
+
+use Carp;
+use File::Slurp;
+
+sub get_line_attr {
+    my ($contents, $attr) = @_;
+
+    $contents =~ /^$attr: (.*)/m;
+    return $1;
+}
+
+sub get_block_attr {
+    my ($contents, $attr) = @_;
+
+    # Collect lines that start with space
+    $contents =~ /^$attr:[\ \t]*([^\n]*\n(\ [^\n]+\n)*)/m;
+    return $1;
+}
+
+sub parse_dsc {
+    my ($infile, $outfile) = @_;
+
+    my $dsc = read_file($infile);
+    croak "Empty file?" unless $dsc;
+
+    my $source_package = get_line_attr($dsc, 'Source');
+    my @binary_packages = split(/,/, get_line_attr($dsc, 'Binary'));
+    @binary_packages = map { $_ =~ s/^\s+|\s+$//g ; $_ } @binary_packages;
+
+    my $arch = get_line_attr($dsc, 'Architecture');
+    $arch =~ s/^\s+|\s+$//g;
+
+    my $evr = get_line_attr($dsc, 'Version');
+    $evr =~ s/-/_/g;
+
+    print { $outfile } "Name: $source_package\n";
+    print { $outfile } "Version: $evr\n";
+    print { $outfile } "Release: 0\n";
+    print { $outfile } "Summary: This is an automagically converted Debian package\n";
+    print { $outfile } "License: GPL\n";
+    print { $outfile } "BuildArch: noarch\n" if $arch eq "all";
+    print { $outfile } "Source0: $infile\n";
+
+    my $i = 0;
+    foreach my $line (split(/\n/, get_block_attr($dsc, 'Files'))) {
+        my @files = split(/\s+/, $line);
+        next unless @files;
+        $i += 1;
+        print { $outfile } "Source$i: " . $files[-1] . "\n";
+    }
+
+    my $deps = get_block_attr($dsc, 'Build-Depends');
+    $deps =~ s/\R//g;
+    my @deps = split(/,/, $deps);
+    push(@deps, 'dh-installrpm');
+    push(@deps, 'fakeroot');
+    @deps = map { $_ =~ s/^\s+|\s+$//g ; $_ } @deps;
+
+    for my $dep (sort(@deps)) {
+        # remove leading/trailing whitespaces
+        $dep =~ s/^\s+|\s+$//g;
+        # remove parantheses
+        $dep =~ s/\(([^)]*)\)/$1/xm;
+        # rewrite << and >>
+        $dep =~ s/>>/>/g;
+        $dep =~ s/<</</g;
+        print { $outfile } "BuildRequires: $dep\n";
+    }
+
+    my $description_section =<<'EOF';
+%description
+Silly description for the automagically converted Debian package.
+EOF
+
+    my $subpackage_section =<<'EOF';
+%package -n @@name@@
+Group: Development/Libraries
+Summary: This is an automagically converted Debian subpackage
+
+%description -n @@name@@
+Silly description for the automagically converted Debian package.
+EOF
+
+    my $post_ldconfig_section =<<'EOF';
+%post @@package@@ -p /sbin/ldconfig
+%postun @@package@@ -p /sbin/ldconfig
+EOF
+
+    my $prep_section =<<'EOF';
+%prep
+dpkg-source -x %{S:0} $(pwd)/%{name}-%{version}
+%setup -q -D -T
+EOF
+
+    my $build_section =<<'EOF';
+%build
+debian/rules build
+EOF
+
+    my $install_section =<<'EOF';
+%install
+fakeroot debian/rules install
+dh_installrpm %{buildroot}
+EOF
+
+    my $files_section =<<'EOF';
+%files @@package@@ @@file_list@@
+%defattr(-,root,root)
+EOF
+
+    print { $outfile } "\n";
+    print { $outfile } $description_section;
+
+    foreach my $package (@binary_packages) {
+        next if $package eq $source_package;
+        my %vars = (
+            name => $package,
+            package => "-n $package",
+        );
+        (my $str = $subpackage_section) =~
+        s/@@(\w+)@@/exists $vars{$1} ? $vars{$1} : '@@$1@@'/eg;
+        print { $outfile } "\n";
+        print { $outfile } $str;
+
+        # add ldconfig hooks if package matches shared library packaging policy
+        next if $package !~ /^lib.*\d$/;
+
+        ($str = $post_ldconfig_section) =~
+        s/@@(\w+)@@/exists $vars{$1} ? $vars{$1} : '@@$1@@'/eg;
+        print { $outfile } "\n";
+        print { $outfile } $str;
+    }
+
+    print { $outfile } "\n";
+    print { $outfile } $prep_section;
+    print { $outfile } "\n";
+    print { $outfile } $build_section;
+    print { $outfile } "\n";
+    print { $outfile } $install_section;
+
+    foreach my $package (@binary_packages) {
+        my %vars = (
+            name => "$package",
+            package => "-n $package",
+            file_list => "-f $package.list",
+        );
+        $vars{package} = '' if $package eq $source_package;
+        (my $str = $files_section) =~
+        s/@@(\w+)@@/exists $vars{$1} ? $vars{$1} : '@@$1@@'/eg;
+        print { $outfile } "\n";
+        print { $outfile } $str;
+    }
+}
+
+sub usage {
+    my $text = <<'END';
+Usage: dsc2spec --outdir $DIR --filename $SPECFILE
+END
+    print { *STDERR } $text;
+    exit;
+}
+
+my $infile;
+my $outfile = *STDOUT;
+
+my $opt_outdir;
+my $opt_filename;
+
+while (@ARGV) {
+    usage() if $ARGV[0] eq '--help';
+    if ($ARGV[0] eq '--outdir') {
+        shift @ARGV;
+        $opt_outdir = shift @ARGV;
+        next;
+    }
+    if ($ARGV[0] eq '--filename') {
+        shift @ARGV;
+        $opt_filename = shift @ARGV;
+        next;
+    }
+    $infile = $ARGV[0] unless $opt_outdir;
+    last;
+}
+
+# get local file list
+local *D;
+opendir(D, ".") || return ();
+my @srcfiles = grep {
+    $_ ne '.' && $_ ne '..' && $_ =~ '.*\.dsc$'
+} readdir(D);
+closedir D;
+
+$infile = $infile ? $infile : $srcfiles[0];
+
+croak "No input *.dsc file?" unless $infile;
+
+if ($opt_filename) {
+    usage() unless $opt_outdir;
+    open($outfile, ">", join('/', $opt_outdir, $opt_filename))
+        or croak "cannot open file for writing";
+}
+
+parse_dsc($infile, $outfile);
+
+close($outfile) if $opt_filename;
