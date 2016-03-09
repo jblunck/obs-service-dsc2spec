@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# install files from debian package directories into %{buildroot}
+#
+
+: ${RPM_BUILD_ROOT:=$1}
+
+if [ ! -d "${RPM_BUILD_ROOT}" ]; then
+    echo "\$RPM_BUILD_ROOT doesn't exist: \'$RPM_BUILD_ROOT\'" >&2
+    exit -1
+fi
+
+FIND_IGNORE="( -regex '\(.*~\|.*\.bak\|.*\.swp\|.*\#.*\#\)' -o -name DEBIAN ) -prune -o"
+
+# this should be moved into a helper (e.g. dh_installrpm)
+for file in $(dh_listpackages); do
+    pushd debian/$file
+
+    # fixup file list
+    if [ -d usr/share/doc/$file ]; then
+	DOCDIR="$(pwd)$(rpm --eval %{_defaultdocdir})"
+        mkdir -p ${DOCDIR}
+        mv usr/share/doc/$file ${DOCDIR}/$file
+    fi
+    if [ -d usr/lib ]; then
+	LIBDIR="$(pwd)$(rpm --eval %{_libdir})"
+	mkdir -p ${LIBDIR}
+        mv usr/lib/* ${LIBDIR}
+	rmdir usr/lib
+    fi
+    if [ -d usr/share/perl5 ]; then
+	PERL_VENDORLIB="$(pwd)$(rpm --eval %{perl_vendorlib})"
+	mkdir -p ${PERL_VENDORLIB}
+	mv usr/share/perl5/* ${PERL_VENDORLIB}
+	rmdir usr/share/perl5
+    fi
+
+    # Generate list of directories owned by the package
+    find . -mindepth 1 ${FIND_IGNORE} -type d -printf '/%P\0' | \
+        xargs -0 -I {} bash -c \
+              'rpm --quiet -qf {} 2>/dev/null || echo %dir {}' \
+              > ../../$file.list
+    find . ${FIND_IGNORE} -type f -printf '/%P\n' \
+	 >> ../../$file.list
+    find . ${FIND_IGNORE} -type l -printf '/%P\n' \
+	 >> ../../$file.list
+
+    # Do the actual install
+    find . ${FIND_IGNORE} -print0 | \
+	cpio -0pd ${RPM_BUILD_ROOT}
+    popd
+done
