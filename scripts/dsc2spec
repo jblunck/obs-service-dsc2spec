@@ -107,6 +107,7 @@ EOF
 
     my $build_section =<<'EOF';
 %build
+export DH_VERBOSE=1
 export DEB_CFLAGS_APPEND="$RPM_OPT_FLAGS"
 export DEB_CXXFLAGS_APPEND="$RPM_OPT_FLAGS"
 debian/rules build
