@@ -27,6 +27,7 @@ Debianhelper script to install from debian/* to RPM_BUILD_ROOT.
 %install
 mkdir -p %{buildroot}%{_bindir}
 install -m755 scripts/dh_installrpm %{buildroot}%{_bindir}
+install -m755 scripts/dh_installrpm_find_requires %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_prefix}/lib/obs/service
 install -m755 scripts/dsc2spec %{buildroot}%{_prefix}/lib/obs/service
 install -m644 scripts/dsc2spec.service %{buildroot}%{_prefix}/lib/obs/service
@@ -38,5 +39,6 @@ install -m644 scripts/dsc2spec.service %{buildroot}%{_prefix}/lib/obs/service
 %files -n dh-installrpm
 %defattr(-,root,root)
 %{_bindir}/dh_installrpm
+%{_bindir}/dh_installrpm_find_requires
 
 %changelog

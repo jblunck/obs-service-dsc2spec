@@ -1,0 +1,15 @@
+#!/bin/sh
+
+LOGFILE="/tmp/dh_installrpm_find_requires.log"
+FINDREQ=$(rpm --eval '%{__find_requires}' | sed -e 's/%name//')
+DH_INSTALLRPM_DIR=$1
+shift
+
+env > ${LOGFILE}
+echo "${FINDREQ} $*" >> ${LOGFILE}
+${FINDREQ} $* | tee --append ${LOGFILE}
+
+echo "DH_INSTALLRPM_DIR=${DH_INSTALLRPM_DIR}" >> ${LOGFILE}
+if [ -f "${DH_INSTALLRPM_DIR}/$1.reqs" ]; then
+    cat "${DH_INSTALLRPM_DIR}/$1.reqs" | tee --append ${LOGFILE}
+fi

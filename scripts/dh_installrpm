@@ -18,6 +18,14 @@ DPKG_ARCH_TRIPLE="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
 for file in $(dh_listpackages); do
     pushd debian/$file
 
+    # write *.reqs file read by dh_installrpm_find_requires
+    grep -E '^Depends:' DEBIAN/control | \
+        sed -e 's/^Depends://' -e 's/,/\n/g' -e 's/^\s*//mg' \
+            > ../../$file.reqs
+    sed -i -re 's/\(([^)]*)\)/\1/g' ../../$file.reqs
+    sed -i -e 's/>>/>/g' ../../$file.reqs
+    sed -i -e 's/<</</g' ../../$file.reqs
+
     # fixup file list
     if [ -d usr/share/doc/$file ]; then
 	DOCDIR="$(pwd)$(rpm --eval %{_defaultdocdir})"
