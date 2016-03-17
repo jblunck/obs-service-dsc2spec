@@ -65,9 +65,16 @@ sub parse_dsc {
     my $deps = get_block_attr($dsc, 'Build-Depends');
     $deps =~ s/\R//g;
     my @deps = split(/,/, $deps);
+    @deps = map { $_ =~ s/^\s+|\s+$//g ; $_ } @deps;
+
+    my $indeps = get_block_attr($dsc, 'Build-Depends-Indep');
+    $indeps =~ s/\R//g;
+    my @indeps = split(/,/, $indeps);
+    @indeps = map { $_ =~ s/^\s+|\s+$//g ; $_ } @indeps;
+
+    push(@deps, @indeps);
     push(@deps, 'dh-installrpm');
     push(@deps, 'fakeroot');
-    @deps = map { $_ =~ s/^\s+|\s+$//g ; $_ } @deps;
 
     for my $dep (sort(@deps)) {
         # remove leading/trailing whitespaces
