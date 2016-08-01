@@ -5,4 +5,7 @@
         <description>The name of the output RPM specfile</description>
         <required/>
     </parameter>
+    <parameter name="deb-build-options">
+        <description>The value of the DEB_BUILD_OPTIONS environment variable.</description>
+    </parameter>
 </service>

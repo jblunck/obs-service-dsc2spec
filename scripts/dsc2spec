@@ -32,7 +32,10 @@ sub get_block_attr {
 }
 
 sub parse_dsc {
-    my ($infile, $outfile) = @_;
+    my ($infile, $outfile, $optsref) = @_;
+    my %opts = %{ $optsref };
+
+    $opts{DEB_BUILD_OPTIONS} ||= '';
 
     my $dsc = read_file($infile);
     croak "Empty file?" unless $dsc;
@@ -122,16 +125,18 @@ dpkg-source -x %{S:0} $(pwd)/%{name}-%{version}
 %setup -q -D -T
 EOF
 
-    my $build_section =<<'EOF';
+    my $build_section =<<"EOF";
 %build
 export DH_VERBOSE=1
-export DEB_CFLAGS_APPEND="$RPM_OPT_FLAGS"
-export DEB_CXXFLAGS_APPEND="$RPM_OPT_FLAGS"
+export DEB_CFLAGS_APPEND="\$RPM_OPT_FLAGS"
+export DEB_CXXFLAGS_APPEND="\$RPM_OPT_FLAGS"
+export DEB_BUILD_OPTIONS="$opts{DEB_BUILD_OPTIONS}"
 debian/rules build
 EOF
 
-    my $install_section =<<'EOF';
+    my $install_section =<<"EOF";
 %install
+export DEB_BUILD_OPTIONS="$opts{DEB_BUILD_OPTIONS}"
 fakeroot debian/rules install
 dh_installrpm %{buildroot}
 EOF
@@ -198,6 +203,7 @@ my $outfile = *STDOUT;
 
 my $opt_outdir;
 my $opt_filename;
+my $opt_DEB_BUILD_OPTIONS;
 
 while (@ARGV) {
     usage() if $ARGV[0] eq '--help';
@@ -209,6 +215,11 @@ while (@ARGV) {
     if ($ARGV[0] eq '--filename') {
         shift @ARGV;
         $opt_filename = shift @ARGV;
+        next;
+    }
+    if ($ARGV[0] eq '--deb-build-options') {
+        shift @ARGV;
+        $opt_DEB_BUILD_OPTIONS = shift @ARGV;
         next;
     }
     $infile = $ARGV[0] unless $opt_outdir;
@@ -233,6 +244,6 @@ if ($opt_filename) {
         or croak "cannot open file for writing";
 }
 
-parse_dsc($infile, $outfile);
+parse_dsc($infile, $outfile, { DEB_BUILD_OPTIONS => $opt_DEB_BUILD_OPTIONS });
 
 close($outfile) if $opt_filename;
