@@ -13,6 +13,7 @@ use strict;
 use warnings;
 
 use Carp;
+use File::Basename;
 use File::Slurp;
 
 sub get_line_attr {
@@ -71,8 +72,17 @@ sub parse_dsc {
     $indeps =~ s/\R//g;
     my @indeps = split(/,/, $indeps);
     @indeps = map { $_ =~ s/^\s+|\s+$//g ; $_ } @indeps;
-
     push(@deps, @indeps);
+
+    my $d2sfile = dirname($infile) . '/' if dirname($infile);
+    $d2sfile .= get_line_attr($dsc, 'Source') . '.dsc2spec';
+    my $d2s = read_file($d2sfile, { err_mode => 'quiet' });
+    my $d2sdeps = get_block_attr($d2s, 'Build-Depends');
+    $d2sdeps =~ s/\R//g;
+    my @d2sdeps = split(/,/, $d2sdeps);
+    @d2sdeps = map { $_ =~ s/^\s+|\s+$//g ; $_ } @d2sdeps;
+    push(@deps, @d2sdeps);
+
     push(@deps, 'dh-installrpm');
     push(@deps, 'fakeroot');
 
