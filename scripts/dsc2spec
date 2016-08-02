@@ -31,6 +31,16 @@ sub get_block_attr {
     return $1;
 }
 
+sub tokenize_deps {
+    my ($str) = @_;
+
+    $str ||= '';
+    $str =~ s/\R//g;
+    my @deps = split(/,/, $str);
+    @deps = map { $_ =~ s/^\s+|\s+$//g ; $_ } @deps;
+    return @deps;
+}
+
 sub parse_dsc {
     my ($infile, $outfile, $optsref) = @_;
     my %opts = %{ $optsref };
@@ -66,24 +76,15 @@ sub parse_dsc {
         print { $outfile } "Source$i: " . $files[-1] . "\n";
     }
 
-    my $deps = get_block_attr($dsc, 'Build-Depends');
-    $deps =~ s/\R//g;
-    my @deps = split(/,/, $deps);
-    @deps = map { $_ =~ s/^\s+|\s+$//g ; $_ } @deps;
+    my @deps = tokenize_deps(get_block_attr($dsc, 'Build-Depends'));
 
-    my $indeps = get_block_attr($dsc, 'Build-Depends-Indep');
-    $indeps =~ s/\R//g;
-    my @indeps = split(/,/, $indeps);
-    @indeps = map { $_ =~ s/^\s+|\s+$//g ; $_ } @indeps;
+    my @indeps = tokenize_deps(get_block_attr($dsc, 'Build-Depends-Indep'));
     push(@deps, @indeps);
 
     my $d2sfile = dirname($infile) . '/' if dirname($infile);
     $d2sfile .= get_line_attr($dsc, 'Source') . '.dsc2spec';
     my $d2s = read_file($d2sfile, { err_mode => 'quiet' });
-    my $d2sdeps = get_block_attr($d2s, 'Build-Depends');
-    $d2sdeps =~ s/\R//g;
-    my @d2sdeps = split(/,/, $d2sdeps);
-    @d2sdeps = map { $_ =~ s/^\s+|\s+$//g ; $_ } @d2sdeps;
+    my @d2sdeps = tokenize_deps(get_block_attr($d2s, 'Build-Depends'));
     push(@deps, @d2sdeps);
 
     push(@deps, 'dh-installrpm');
