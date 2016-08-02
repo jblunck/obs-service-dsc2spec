@@ -83,9 +83,11 @@ sub parse_dsc {
 
     my $d2sfile = dirname($infile) . '/' if dirname($infile);
     $d2sfile .= get_line_attr($dsc, 'Source') . '.dsc2spec';
-    my $d2s = read_file($d2sfile, { err_mode => 'quiet' });
-    my @d2sdeps = tokenize_deps(get_block_attr($d2s, 'Build-Depends'));
-    push(@deps, @d2sdeps);
+    if (-r $d2sfile) {
+        my $d2s = read_file($d2sfile);
+        my @d2sdeps = tokenize_deps(get_block_attr($d2s, 'Build-Depends'));
+        push(@deps, @d2sdeps);
+    }
 
     push(@deps, 'dh-installrpm');
     push(@deps, 'fakeroot');
