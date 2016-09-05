@@ -12,6 +12,8 @@ fi
 
 FIND_IGNORE="( -regex '\(.*~\|.*\.bak\|.*\.swp\|.*\#.*\#\)' -o -name DEBIAN ) -prune -o"
 
+DPKG_ARCH_TRIPLE="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+
 # this should be moved into a helper (e.g. dh_installrpm)
 for file in $(dh_listpackages); do
     pushd debian/$file
@@ -22,11 +24,11 @@ for file in $(dh_listpackages); do
         mkdir -p ${DOCDIR}
         mv usr/share/doc/$file ${DOCDIR}/$file
     fi
-    if [ -d usr/lib ]; then
+    if [ -d usr/lib/${DPKG_ARCH_TRIPLE} ]; then
 	LIBDIR="$(pwd)$(rpm --eval %{_libdir})"
 	mkdir -p ${LIBDIR}
-        mv usr/lib/* ${LIBDIR}
-	rmdir usr/lib
+	mv usr/lib/${DPKG_ARCH_TRIPLE}/* ${LIBDIR}
+	rmdir usr/lib/${DPKG_ARCH_TRIPLE}
     fi
     if [ -d usr/share/perl5 ]; then
 	PERL_VENDORLIB="$(pwd)$(rpm --eval %{perl_vendorlib})"
