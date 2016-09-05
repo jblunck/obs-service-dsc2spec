@@ -29,6 +29,11 @@ for file in $(dh_listpackages); do
 	mkdir -p ${LIBDIR}
 	mv usr/lib/${DPKG_ARCH_TRIPLE}/* ${LIBDIR}
 	rmdir usr/lib/${DPKG_ARCH_TRIPLE}
+    elif [ -d usr/lib ]; then
+	LIBDIR="$(pwd)$(rpm --eval %{_libdir})"
+	mkdir -p ${LIBDIR}
+	mv usr/lib/* ${LIBDIR}
+	rmdir usr/lib
     fi
     if [ -d usr/share/perl5 ]; then
 	PERL_VENDORLIB="$(pwd)$(rpm --eval %{perl_vendorlib})"
